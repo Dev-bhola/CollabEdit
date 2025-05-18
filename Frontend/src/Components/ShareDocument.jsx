@@ -1,15 +1,27 @@
 import React, { useState } from "react";
+import { toast } from "react-toastify";
 
 const ShareDocument = ({ isOpen, onClose, documentId, onShare }) => {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("viewer");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onShare(documentId, email, role);
-    setEmail("");
-    setRole("viewer");
-    onClose();
+    setLoading(true);
+    try {
+      await onShare(documentId, email, role);
+      toast.success("Role assigned successfully!");
+      setEmail("");
+      setRole("viewer");
+      onClose();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Failed to assign role. Try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -27,6 +39,7 @@ const ShareDocument = ({ isOpen, onClose, documentId, onShare }) => {
             <input
               type="email"
               value={email}
+              disabled={loading}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
               placeholder="user@example.com"
@@ -40,6 +53,7 @@ const ShareDocument = ({ isOpen, onClose, documentId, onShare }) => {
             </label>
             <select
               value={role}
+              disabled={loading}
               onChange={(e) => setRole(e.target.value)}
               className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
             >
@@ -51,6 +65,7 @@ const ShareDocument = ({ isOpen, onClose, documentId, onShare }) => {
           <div className="flex justify-end space-x-2">
             <button
               type="button"
+              disabled={loading}
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
             >
@@ -58,9 +73,10 @@ const ShareDocument = ({ isOpen, onClose, documentId, onShare }) => {
             </button>
             <button
               type="submit"
+              disabled={loading}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
             >
-              Add Roles
+              {loading ? "Adding..." : "Add Roles"}
             </button>
           </div>
         </form>

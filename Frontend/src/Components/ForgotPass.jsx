@@ -27,6 +27,9 @@ const ForgotPass = () => {
         {
           email, 
         }
+        ,{
+          withCredentials: true,
+        }
       );
 
       // Check if the response indicates success

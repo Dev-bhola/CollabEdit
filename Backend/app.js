@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const http = require("http");
 const crypto = require("crypto");
+const cookie = require("cookie");
 const nodemailer = require("nodemailer");
 const mongoose = require("mongoose");
 const mongoDBPass = process.env.MONGO_DB_PASS;;
@@ -15,6 +16,7 @@ const SECRET = process.env.JWT_SECRET;
 const corsOptions = {
   origin: process.env.CORS_ORIGIN,
   methods: ["GET", "POST"],
+  credentials: true,
 };
 const Document = require("./models/Document");
 const user = require("./models/user");
@@ -34,10 +36,13 @@ const io = require("socket.io")(server, {
   cors: {
     origin: "http://localhost:5173",
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 async function authenticateSocket(socket, next) {
-  const token = socket.handshake.auth.token;
+  // Parse cookies from handshake headers
+  const cookies = cookie.parse(socket.handshake.headers.cookie || "");
+  const token = cookies.token;
   if (!token) return next(new Error("Authentication error"));
 
   try {
@@ -79,7 +84,7 @@ io.on("connection", (socket) => {
     socket.join(document._id.toString());
     socket.emit("load-document", document.content);
     socket.emit("user-role", socket.userRole);
-
+    console.log(socket.userRole);
     socket.on("send-changes", (delta) => {
       if (socket.userRole === "viewer" || socket.userRole === "none") return;
       socket.broadcast
@@ -114,23 +119,35 @@ io.on("connection", (socket) => {
     });
   });
 });
+const User = require("./models/user"); // adjust the path
+
 async function authenticateUser(req, res, next) {
-  const token = req.headers["authorization"]?.split(" ")[1];
+  const token = req.cookies.token;
   if (!token) {
     return res.status(401).json({ message: "No token provided" });
   }
-
+  console.log(token);
   try {
-    const decoded = jwt.verify(token, SECRET); 
-    req.user = decoded;
+    const decoded = jwt.verify(token, SECRET);
+    console.log("Decoded token in middleware:", decoded);
+    const user = await User.findById(decoded.userId);// depends how you signed the token
+    if (!user) {
+      return res.status(401).json({ message: "User Not found" });
+    }
+    console.log(user);
+
+    req.user = user; // ✅ now req.user._id works!
     next();
   } catch (err) {
     return res.status(403).json({ message: "Invalid or expired token" });
   }
 }
 
+
 app.use(express.json());
+app.use(cookieParser());  
 app.use(cors(corsOptions));
+app.use(express.urlencoded({ extended: true }));
 
 const userSchema = z.object({
   name: z
@@ -181,16 +198,22 @@ app.post("/signup", async (req, res) => {
       { email: createdUser.email, userId: createdUser._id },
       SECRET
     );
-
-
-    res.status(201).json({ message: "Signup successful!", token });
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // true in production
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    res.status(201).json({ message: "Signup successful!"});
   } catch (err) {
     res.status(400).json({ error: err.errors });
   }
 });
 app.post("/login", async (req, res) => {
   try {
+    console.log(req.body.email);
     const user = await userModel.findOne({ email: req.body.email });
+    console.log(user);
 
     if (!user) {
       return res.status(400).json({ message: "Invalid email address" });
@@ -207,17 +230,15 @@ app.post("/login", async (req, res) => {
         expiresIn: req.body.rememberMe ? "7d" : "1h",
       });
 
-      if (req.body.rememberMe) {
-        res.status(200).json({ message: "Login successful", token });
-      } else {
-       
-        res.cookie("token", token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production", 
-          maxAge: 3600000, 
-        });
-        res.status(200).json({ message: "Login successful", token });
-      }
+      // Always set the cookie
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: req.body.rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
+      });
+
+      res.status(200).json({ message: "Login successful" });
     });
   } catch (error) {
     console.error(error);
@@ -235,13 +256,16 @@ async function findOrCreateDocument(title, userId) {
   console.log("title",title)
   console.log('userId',userId);
   const newDocument = await Document.create({
-    title, 
+    title,
     content: "",
     roles: {
       creator: userId,
-    }, 
-    lastModifiedBy: userId, 
+      editors: [],
+      viewers: [],
+    },
+    lastModifiedBy: userId,
   });
+  
   console.log("New document created:", newDocument);
   await user.findByIdAndUpdate(userId, {
     $push: { documents: newDocument._id },
@@ -251,7 +275,7 @@ async function findOrCreateDocument(title, userId) {
 }
 app.get("/documents", authenticateUser, async (req, res) => {
   try {
-    const data = await user.findById(req.user.userId).populate("documents"); 
+    const data = await user.findById(req.user._id).populate("documents"); 
 
     if (!data) {
       return res.status(404).json({ message: "User not found" });
@@ -279,32 +303,103 @@ app.post("/documents/delete", async (req, res) => {
 });
 app.post("/documents/share", authenticateUser, async (req, res) => {
   const { documentId, email, role } = req.body;
+  console.log("req.user._id:", req.user?._id);
   try {
-    const targetUser = await user.findOne({ email });
-    if (!targetUser) return res.status(404).json({ message: "User not found" });
+    // 1. Validate the role
+    if (!["viewer", "editor"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
 
+    // 2. Find the user with that email
+    const targetUser = await User.findOne({ email });
+    if (!targetUser) {
+      return res
+        .status(404)
+        .json({ message: "No user found with this email." });
+    }
+
+    // 3. Prevent sharing with yourself
+    if (req.user._id.toString() === targetUser._id.toString()) {
+      return res
+        .status(400)
+        .json({ message: "You cannot share a document with yourself." });
+    }
+
+    // 4. Find the document
     const document = await Document.findById(documentId);
-    if (!document)
-      return res.status(404).json({ message: "Document not found" });
+    if (!document) {
+      return res.status(404).json({ message: "Document not found." });
+    }
+    console.log("document.roles.creator:", document.roles.creator);
+    
+    // 5. Defensive: make sure roles object is always initialized
+    if (!document.roles) {
+      document.roles = { creator: null, editors: [], viewers: [] };
+    }
+    if (!document.roles.editors) document.roles.editors = [];
+    if (!document.roles.viewers) document.roles.viewers = [];
 
-    const roleField = role + "s";
+    // 6. Check if requester is the creator
+    
+    if (
+      !document.roles.creator ||
+      document.roles.creator.toString() !== req.user._id.toString()
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Only the document creator can share it." });
+    }
 
-    // ...existing code...
-    await Document.findByIdAndUpdate(documentId, {
-      $addToSet: { [`roles.${roleField}`]: targetUser._id },
-    });
-    // Remove this line:
-    // if(roleField==='viewers') res.status(200).json({ message: "Document shared successfully" });
-    await user.findByIdAndUpdate(targetUser._id, {
-      $addToSet: { documents: documentId },
-    });
+    const targetRoleField = role + "s"; // viewers or editors
+    const currentRoles = document.roles;
 
-    res.status(200).json({ message: "Document shared successfully" });
-    // ...existing code...
+    // 7. Remove from previous roles if present
+    const rolesToRemoveFrom = ["editors", "viewers"].filter(
+      (r) => r !== targetRoleField
+    );
+    let roleChanged = false;
+
+    for (const field of rolesToRemoveFrom) {
+      if (
+        currentRoles[field].some(
+          (id) => id.toString() === targetUser._id.toString()
+        )
+      ) {
+        await Document.findByIdAndUpdate(documentId, {
+          $pull: { [`roles.${field}`]: targetUser._id },
+        });
+        roleChanged = true;
+      }
+    }
+
+    // 8. Add to target role if not already there
+    const alreadyInTargetRole = currentRoles[targetRoleField].some(
+      (id) => id.toString() === targetUser._id.toString()
+    );
+
+    if (!alreadyInTargetRole) {
+      await Document.findByIdAndUpdate(documentId, {
+        $addToSet: { [`roles.${targetRoleField}`]: targetUser._id },
+      });
+      await user.findByIdAndUpdate(targetUser._id, {
+        $addToSet: { documents: documentId },
+      });
+    }
+
+    const message = alreadyInTargetRole
+      ? `User already has the role '${role}'.`
+      : roleChanged
+      ? `Updated user role to '${role}'.`
+      : `User assigned role '${role}' successfully.`;
+
+    res.status(200).json({ message });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error sharing document:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
+
+
 const PORT = process.env.PORT || 3000;;
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

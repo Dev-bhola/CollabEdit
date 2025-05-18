@@ -96,7 +96,8 @@ const Signup = () => {
     try {
       const response = await axios.post(
         "http://localhost:3000/signup",
-        formData
+        formData,
+        {withCredentials: true}
       );
       setMessages({
         success: response.data.message || "Account created successfully!",

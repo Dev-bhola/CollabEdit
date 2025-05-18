@@ -28,10 +28,12 @@ export default function Editor() {
   const navigate = useNavigate();
   const [socket, setSocket] = useState();
   const [quill, setQuill] = useState();
+  const [userRole, setUserRole] = useState("none");
 
   useEffect(() => {
+    console.log("Token in cookie:", document.cookie);
     const s = io("http://localhost:3000", {
-      auth: { token: localStorage.getItem("userToken") || "abc" },
+      withCredentials:true,
     });
     setSocket(s);
     return () => s.disconnect();
@@ -60,8 +62,10 @@ export default function Editor() {
       quill.enable();
     });
     socket.once("user-role", (role) => {
-      if (role === "viewer") {
-        quill.enable(false);
+      setUserRole(role);
+      console.log("User role:", role);
+      if (role === "viewer" || role === "none") {
+        quill.disable(); // Properly disables the editor
       } else {
         quill.enable();
       }
@@ -130,7 +134,8 @@ export default function Editor() {
           }, 500);
         }}
       >
-        Save
+        {console.log("User role:", userRole)}
+        {userRole === "viewer" ? "Exit" : "Save"}
       </button>
       <div
         className="container"

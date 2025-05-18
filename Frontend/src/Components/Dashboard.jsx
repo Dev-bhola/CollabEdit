@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import OpenDocument from "./OpenDocument";
 import ShareDocument from "./ShareDocument";
 const Dashboard = () => {
@@ -10,26 +12,20 @@ const Dashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState(null);
-  const [userId,setUserId] = useState("");
+  const [userId, setUserId] = useState("");
   const [newDocumentName, setNewDocumentName] = useState("");
   const navigate = useNavigate();
-
   const handleShare = async (docId, email, role) => {
-    const token = localStorage.getItem("userToken");
+    // eslint-disable-next-line no-useless-catch
     try {
-      await axios.post(
+      const response = await axios.post(
         "http://localhost:3000/documents/share",
-        {
-          documentId: docId,
-          email,
-          role,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { documentId: docId, email, role },
+        { withCredentials: true }
       );
+      return response.data;
     } catch (error) {
-      console.error("Error sharing document:", error);
+      throw error;
     }
   };
 
@@ -44,7 +40,11 @@ const Dashboard = () => {
   };
 
   const delSpecificDoc = (id) => {
-    axios.post("http://localhost:3000/documents/delete", { data: id });
+    axios.post(
+      "http://localhost:3000/documents/delete",
+      { data: id },
+      { withCredentials: true }
+    );
     setDocuments(documents.filter((d) => d._id !== id));
   };
 
@@ -57,7 +57,7 @@ const Dashboard = () => {
 
     axios
       .get("http://localhost:3000/documents", {
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       })
       .then((response) => {
         setUserId(response.data._id);
@@ -142,16 +142,17 @@ const Dashboard = () => {
                   >
                     Open
                   </button>
-                  {doc.roles.creator==userId && <button
-                    onClick={() => {
-                      setSelectedDocId(doc._id);
-                      setShowShareModal(true);
-                    }}
-                    className="bg-purple-500 hover:bg-purple-400 text-white px-2 py-1 rounded"
-                  >
-                    
-                    Add Roles
-                  </button>}
+                  {doc.roles.creator == userId && (
+                    <button
+                      onClick={() => {
+                        setSelectedDocId(doc._id);
+                        setShowShareModal(true);
+                      }}
+                      className="bg-purple-500 hover:bg-purple-400 text-white px-2 py-1 rounded"
+                    >
+                      Add Roles
+                    </button>
+                  )}
                   <button
                     onClick={() => delSpecificDoc(doc._id)}
                     className="bg-red-500 hover:bg-red-400 text-white px-2 py-1 rounded"

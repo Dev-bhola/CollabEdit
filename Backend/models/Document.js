@@ -19,12 +19,14 @@ const documentSchema = new mongoose.Schema({
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "user",
+        default: [],
       },
     ],
     viewers: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "user",
+        default: [],
       },
     ],
   },
