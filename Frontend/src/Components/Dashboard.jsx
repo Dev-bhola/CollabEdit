@@ -10,6 +10,7 @@ const Dashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState(null);
+  const [userId,setUserId] = useState("");
   const [newDocumentName, setNewDocumentName] = useState("");
   const navigate = useNavigate();
 
@@ -59,6 +60,7 @@ const Dashboard = () => {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {
+        setUserId(response.data._id);
         setUserName(response.data.name);
         setDocuments(response.data.documents);
       })
@@ -85,7 +87,6 @@ const Dashboard = () => {
   useEffect(() => {
     fetchUserData();
   }, []);
-
   return (
     <div
       className={`min-h-screen ${
@@ -141,15 +142,16 @@ const Dashboard = () => {
                   >
                     Open
                   </button>
-                  <button
+                  {doc.roles.creator==userId && <button
                     onClick={() => {
                       setSelectedDocId(doc._id);
                       setShowShareModal(true);
                     }}
                     className="bg-purple-500 hover:bg-purple-400 text-white px-2 py-1 rounded"
                   >
+                    
                     Add Roles
-                  </button>
+                  </button>}
                   <button
                     onClick={() => delSpecificDoc(doc._id)}
                     className="bg-red-500 hover:bg-red-400 text-white px-2 py-1 rounded"

@@ -54,23 +54,50 @@ async function authenticateSocket(socket, next) {
 io.use(authenticateSocket);
 io.on("connection", (socket) => {
   socket.on("get-document", async (title) => {
-    const userId = socket.userId; 
+    const userId = socket.userId;
     const document = await findOrCreateDocument(title, userId);
-    if (document.roles.editors.includes(socket.userId)) {
+
+    if (
+      document.roles.editors &&
+      document.roles.editors.some((id) => id.equals(socket.userId))
+    ) {
       socket.userRole = "editor";
-    } else if (document.roles.viewers.includes(socket.userId)) {
+    } else if (
+      document.roles.viewers &&
+      document.roles.viewers.some((id) => id.equals(socket.userId))
+    ) {
       socket.userRole = "viewer";
-    } else if (document.roles.creator.equals(socket.userId)) {
+    } else if (
+      document.roles.creator &&
+      document.roles.creator.equals(socket.userId)
+    ) {
       socket.userRole = "creator";
+    } else {
+      socket.userRole = "none";
     }
+
     socket.join(document._id.toString());
     socket.emit("load-document", document.content);
     socket.emit("user-role", socket.userRole);
+
     socket.on("send-changes", (delta) => {
-      if (socket.userRole === "viewer") return;
+      if (socket.userRole === "viewer" || socket.userRole === "none") return;
       socket.broadcast
         .to(document._id.toString())
         .emit("receive-changes", delta);
+    });
+
+    socket.on("save-document", async (data) => {
+      if (socket.userRole === "viewer" || socket.userRole === "none") return;
+      try {
+        await Document.findByIdAndUpdate(document._id, {
+          content: data,
+          updatedAt: Date.now(),
+          lastModifiedBy: userId,
+        });
+      } catch (error) {
+        console.error("Error saving document:", error);
+      }
     });
 
     socket.on("save-document", async (data) => {
@@ -262,15 +289,18 @@ app.post("/documents/share", authenticateUser, async (req, res) => {
 
     const roleField = role + "s";
 
+    // ...existing code...
     await Document.findByIdAndUpdate(documentId, {
       $addToSet: { [`roles.${roleField}`]: targetUser._id },
     });
-    if(roleField==='viewers') res.status(200).json({ message: "Document shared successfully" });
+    // Remove this line:
+    // if(roleField==='viewers') res.status(200).json({ message: "Document shared successfully" });
     await user.findByIdAndUpdate(targetUser._id, {
       $addToSet: { documents: documentId },
     });
 
     res.status(200).json({ message: "Document shared successfully" });
+    // ...existing code...
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
