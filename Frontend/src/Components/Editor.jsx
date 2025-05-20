@@ -114,34 +114,27 @@ export default function Editor() {
   }, [socket, quill]);
 
   return (
-    <div style={{ position: "relative", height: "100vh" }}>
+    <div className="flex flex-col h-screen bg-white text-black">
       <button
-        style={{
-          position: "absolute",
-          top: "0px",
-          right: "140px",
-          padding: "8px 28px",
-          backgroundColor: "transparent",
-          color: "black",
-          border: "none",
-          borderRadius: "5px",
-          cursor: "pointer",
-          zIndex: 10,
-        }}
+        className="absolute top-4 right-4 px-5 py-2 bg-white text-black border rounded shadow z-10"
         onClick={() => {
           setTimeout(() => {
             navigate("/dashboard");
           }, 500);
         }}
       >
-        {console.log("User role:", userRole)}
         {userRole === "viewer" ? "Exit" : "Save"}
       </button>
+  
       <div
-        className="container"
+        className="flex-1 mt-16 overflow-y-auto"
         ref={wrapperRef}
-        style={{ height: "calc(100% - 50px)", overflow: "auto" }}
-      ></div>
+      >
+        {/* Quill editor mounts here */}
+      </div>
     </div>
   );
+  
+  
+  
 }

@@ -1,26 +1,24 @@
 import React, { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faGoogle } from "@fortawesome/free-brands-svg-icons";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import useAppStore from "../store/useAppStore";
+import { toast } from "react-toastify";
 
 const Login = () => {
-  // Form state
-  const navigate=useNavigate();
+  const { setAuthenticated, setUser } = useAppStore();
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     rememberMe: false,
   });
-  
-  // UI state
+
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
-  // Input handlers
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     const inputValue = type === "checkbox" ? checked : sanitizeInput(value);
@@ -28,29 +26,25 @@ const Login = () => {
       ...prev,
       [name]: inputValue,
     }));
-    // Clear error when user starts typing
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  // Input sanitization
   const sanitizeInput = (input) => {
     return input.trim().replace(/[<>]/g, "");
   };
 
-  // Form validation
   const validateForm = () => {
     const newErrors = {};
 
-    // Email validation
     if (!formData.email) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Please enter a valid email";
     }
 
-    // Password validation
     if (!formData.password) {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
@@ -61,81 +55,45 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Toast handling
-  const showToast = (message, type) => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
-  };
-
-  // Form submission
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
+
     setIsLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:3000/login",
+        "http://localhost:3000/api/auth/login",
         formData,
-        {
-          withCredentials:true,
-        }
+        { withCredentials: true }
       );
 
-      if (response.status === 200 || response.data.token) {
-        showToast("Successfully logged in!", "success");
-
-        const token = response.data.token;
-
-        if (rememberMe) {
-          // Store token in localStorage if "Remember Me" is selected
-          localStorage.setItem("userToken", token);
-        } else {
-          // Token will be stored in an HTTP-only cookie automatically by the backend
-          // No need to manually handle cookies in the frontend
-          localStorage.setItem("userToken", token);
-        }
-
-        // Proceed to the editor page after successful login
+      if (response.status === 200) {
+        setAuthenticated(true);
+        setUser(response.data.user);
+        toast.success("Successfully logged in!");
         setTimeout(() => navigate("/dashboard"), 1000);
       } else {
-        showToast("Login failed. Please try again.", "error");
+        toast.error("Login failed. Please try again.");
       }
     } catch (error) {
       if (error.response) {
-        showToast(error.response.data.message || "Login failed", "error");
+        toast.error(error.response.data.message || "Login failed");
       } else {
-        console.error(error);
-        showToast("Server error. Please try again later.", "error");
+        toast.error("Server error. Please try again later.");
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-
-
-  // Google login
+  // Google login placeholder - not active now
   const handleGoogleLogin = () => {
-    // Replace with your Google login logic
     console.log("Google login clicked!");
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
-      {/* Toast notification */}
-      {toast.show && (
-        <div
-          className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg ${
-            toast.type === "success" ? "bg-green-500" : "bg-red-500"
-          } text-white transition-opacity duration-300`}
-        >
-          {toast.message}
-        </div>
-      )}
-
       <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md space-y-8 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 to-blue-600"></div>
 
@@ -219,7 +177,6 @@ const Login = () => {
                 Remember me
               </label>
             </div>
-            
           </div>
 
           <button
@@ -247,6 +204,7 @@ const Login = () => {
           </div>
         </div>
 
+        {/* Uncomment if you want Google login button */}
         {/* <button
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center bg-white border border-gray-300 rounded-lg py-3 hover:bg-gray-100 transition-all duration-200 shadow-md"
@@ -258,7 +216,6 @@ const Login = () => {
           />
           Sign in with Google
         </button> */}
-        {/* REmoved for nowww.... */}
 
         <div className="text-center mt-6">
           <p className="text-sm text-gray-600">

@@ -1,221 +1,479 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
-import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import OpenDocument from "./OpenDocument";
-import ShareDocument from "./ShareDocument";
-const Dashboard = () => {
-  const [userName, setUserName] = useState("");
-  const [documents, setDocuments] = useState([]);
-  const [darkMode, setDarkMode] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [selectedDocId, setSelectedDocId] = useState(null);
-  const [userId, setUserId] = useState("");
-  const [newDocumentName, setNewDocumentName] = useState("");
-  const navigate = useNavigate();
-  const handleShare = async (docId, email, role) => {
-    // eslint-disable-next-line no-useless-catch
-    try {
-      const response = await axios.post(
-        "http://localhost:3000/documents/share",
-        { documentId: docId, email, role },
-        { withCredentials: true }
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  };
+  import React, { useState, useEffect } from "react";
+  import { Link, useNavigate } from "react-router-dom";
+  import axios from "axios";
+  import { toast } from "react-toastify";
+  import "react-toastify/dist/ReactToastify.css";
+  import OpenDocument from "./OpenDocument";
+  import ShareDocument from "./ShareDocument";
+  import {
+    FileText,
+    Plus,
+    Sun,
+    Moon,
+    LogOut,
+    Edit,
+    Share2,
+    Trash2,
+    User,
+    Search,
+    MoreHorizontal,
+    Clock,
+    ChevronDown,
+  } from "lucide-react";
+  import useAppStore from "../store/useAppStore";
+  const Dashboard = () => {
+    const user = useAppStore((state) => state.user);
+    const theme = useAppStore((state) => state.theme);
+    const setTheme = useAppStore((state) => state.setTheme);
+    const [documents, setDocuments] = useState([]);
+    
+    const [showModal, setShowModal] = useState(false);
+    const [showOpenDocumentModal, setShowOpenDocumentModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [selectedDocId, setSelectedDocId] = useState(null);
+    const [userId, setUserId] = useState("");
+    const [newDocumentName, setNewDocumentName] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const [sortBy, setSortBy] = useState("recent");
+    const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem("userToken");
-    navigate("/");
-  };
+    useEffect(() => {
+      localStorage.setItem("theme", JSON.stringify(theme));
+      document.documentElement.classList.toggle("dark", theme);
+    }, [theme]);
 
-  const openSpecificDoc = (id) => {
-    const doc = documents.filter((d) => d._id === id);
-    navigate(`/editor/${doc[0].title}`);
-  };
+    const handleShare = async (docId, email, role) => {
+      try {
+        const response = await axios.post(
+          "http://localhost:3000/api/documents/share",
+          { documentId: docId, email, role },
+          { withCredentials: true }
+        );
+        toast.success("Document shared successfully!");
+        return response.data;
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Failed to share document");
+        throw error;
+      }
+    };
 
-  const delSpecificDoc = (id) => {
-    axios.post(
-      "http://localhost:3000/documents/delete",
-      { data: id },
-      { withCredentials: true }
+    const openSpecificDoc = (id) => {
+      const doc = documents.find((d) => d._id === id);
+      if (doc) {
+        navigate(`/editor/${doc.title}`);
+      }
+    };
+
+    const handleLogout = async () => {
+      try {
+        await axios.post(
+          "http://localhost:3000/api/auth/logout",
+          {},
+          { withCredentials: true }
+        );
+        toast.success("Logged out successfully");
+        navigate("/");
+      } catch (error) {
+        toast.error("Failed to logout");
+        console.error("Logout error:", error);
+      }
+    };
+
+    const delSpecificDoc = async (id, e) => {
+      e.stopPropagation();
+      try {
+        await axios.post(
+          "http://localhost:3000/api/documents/delete",
+          { data: id },
+          { withCredentials: true }
+        );
+        setDocuments(documents.filter((d) => d._id !== id));
+        toast.success("Document deleted successfully");
+      } catch (error) {
+        toast.error("Failed to delete document");
+        console.error("Delete error:", error);
+      }
+    };
+
+    const fetchUserData = () => {
+      setIsLoading(true);
+      
+      axios
+        .get("http://localhost:3000/api/documents", {
+          withCredentials: true,
+        })
+        .then((response) => {
+          console.log("User data:", response.data);
+          setUserId(response.data._id);
+          setDocuments(response.data.documents);
+          setIsLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching documents:", error);
+          toast.error("Failed to load documents");
+          setIsLoading(false);
+        });
+        
+    };
+
+    const handleCreateDocument = () => {
+      if (!newDocumentName.trim()) {
+        toast.error("Document name cannot be empty");
+        return;
+      }
+      const slug = newDocumentName
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      navigate(`/editor/${slug}`);
+      setShowModal(false);
+      setNewDocumentName("");
+    };
+
+    useEffect(() => {
+      fetchUserData();
+    }, []);
+
+    const formatDate = (date) => {
+      if (!date) return "N/A";
+      const now = new Date();
+      const docDate = new Date(date);
+      const diffTime = Math.abs(now - docDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 1) {
+        return "Today";
+      } else if (diffDays === 1) {
+        return "Yesterday";
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        return docDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+    };
+
+    const filteredDocuments = documents.filter((doc) =>
+      doc.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    setDocuments(documents.filter((d) => d._id !== id));
-  };
 
-  const fetchUserData = () => {
-    const token = localStorage.getItem("userToken");
-    if (!token) {
-      navigate("/login");
-      return;
-    }
+    const sortedDocuments = [...filteredDocuments].sort((a, b) => {
+      if (sortBy === "recent") {
+        return (
+          new Date(b.updatedAt || b.createdAt) -
+          new Date(a.updatedAt || a.createdAt)
+        );
+      } else if (sortBy === "name") {
+        return a.title.localeCompare(b.title);
+      }
+      return 0;
+    });
 
-    axios
-      .get("http://localhost:3000/documents", {
-        withCredentials: true,
-      })
-      .then((response) => {
-        setUserId(response.data._id);
-        setUserName(response.data.name);
-        setDocuments(response.data.documents);
-      })
-      .catch((error) => {
-        console.error("Error fetching documents:", error);
-      });
-  };
+    const getInitials = (name) => {
+      return name
+        .split(" ")
+        .map((word) => word[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    };
 
-  const handleCreateDocument = () => {
-    if (!newDocumentName.trim()) {
-      alert("Document name cannot be empty.");
-      return;
-    }
-    const slug = newDocumentName
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-    navigate(`/editor/${slug}`);
-    setShowModal(false);
-    setNewDocumentName("");
-  };
+    const openShareModal = (docId, e) => {
+      e.stopPropagation();
+      setSelectedDocId(docId);
+      setShowShareModal(true);
+    };
 
-  useEffect(() => {
-    fetchUserData();
-  }, []);
-  return (
-    <div
-      className={`min-h-screen ${
-        darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"
-      }`}
-    >
-      <header className="bg-blue-600 text-white py-4 px-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">
-          <Link to="/">CollabEdit</Link>
-        </h1>
-        <div className="flex items-center space-x-4">
-          <span>Welcome, {userName}!</span>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 rounded"
-          >
-            {darkMode ? "Light Mode" : "Dark Mode"}
-          </button>
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-400 text-white px-4 py-2 rounded"
-          >
-            Logout
-          </button>
-        </div>
-      </header>
-
-      <main className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Your Documents</h2>
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded"
-          >
-            New Document
-          </button>
-        </div>
-
-        {documents.length > 0 ? (
-          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {documents.map((doc) => (
-              <li
-                key={doc._id}
-                className={`p-4 rounded shadow-md ${
-                  darkMode ? "bg-gray-800" : "bg-white"
-                } hover:shadow-lg`}
+    return (
+      <div
+        className={`min-h-screen transition-colors duration-200 ${
+          theme
+            ? "dark bg-gray-900 text-gray-100"
+            : "bg-gray-100 text-gray-800"
+        }`}
+      >
+        {/* Header */}
+        <header className="sticky top-0 z-10 backdrop-blur-md bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+          <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 className="text-xl font-bold flex items-center">
+              <FileText className="mr-2 text-blue-600 dark:text-blue-400" />
+              <Link
+                to="/"
+                className="text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
               >
-                <h3 className="text-lg font-semibold">{doc.title}</h3>
-                <div className="flex justify-end space-x-2 mt-2">
-                  <button
-                    onClick={() => openSpecificDoc(doc._id)}
-                    className="bg-blue-500 hover:bg-blue-400 text-white px-2 py-1 rounded"
-                  >
-                    Open
-                  </button>
-                  {doc.roles.creator == userId && (
-                    <button
-                      onClick={() => {
-                        setSelectedDocId(doc._id);
-                        setShowShareModal(true);
-                      }}
-                      className="bg-purple-500 hover:bg-purple-400 text-white px-2 py-1 rounded"
-                    >
-                      Add Roles
-                    </button>
-                  )}
-                  <button
-                    onClick={() => delSpecificDoc(doc._id)}
-                    className="bg-red-500 hover:bg-red-400 text-white px-2 py-1 rounded"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No documents found. Click "New Document" to create one!</p>
-        )}
-      </main>
-
-      <footer className="bg-blue-600 text-white py-4 text-center fixed bottom-0 left-0 w-full">
-        <p>© {new Date().getFullYear()} Your App. All rights reserved.</p>
-      </footer>
-
-      <OpenDocument />
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-          <div
-            className={`p-6 rounded shadow-lg ${
-              darkMode ? "bg-gray-800 text-white" : "text-black bg-white"
-            }`}
-          >
-            <h2 className="text-xl font-bold mb-4">New Document</h2>
-            <input
-              type="text"
-              placeholder="Enter document name"
-              value={newDocumentName}
-              onChange={(e) => setNewDocumentName(e.target.value)}
-              className="w-full p-2 border rounded mb-4 text-black"
-            />
-            <div className="flex justify-end space-x-2">
+                CollabEdit
+              </Link>
+            </h1>
+            <div className="flex items-center gap-3">
               <button
-                onClick={handleCreateDocument}
-                className="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded"
+                onClick={() => setTheme(!theme)}
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors duration-200 text-gray-700 dark:text-gray-300"
+                aria-label={
+                  theme ? "Switch to Light Mode" : "Switch to Dark Mode"
+                }
               >
-                Create
+                {theme ? <Sun size={20} /> : <Moon size={20} />}
               </button>
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 py-1 px-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800"
+                >
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
+                    {getInitials(user.name)}
+                  </div>
+                  <ChevronDown
+                    size={16}
+                    className="text-gray-700 dark:text-gray-300"
+                  />
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-20 border border-gray-200 dark:border-gray-700">
+                    <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {user.name}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <LogOut
+                        size={16}
+                        className="mr-2 text-gray-600 dark:text-gray-400"
+                      />
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="container mx-auto px-4 py-6 pb-20">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Documents
+            </h2>
+
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-grow md:max-w-xs">
+                <input
+                  type="text"
+                  placeholder="Search documents..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                />
+              </div>
+
+              <div className="relative">
+                <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm">
+                  <Clock size={16} className="text-gray-600 dark:text-gray-300" />
+                  <span>{sortBy === "recent" ? "Recent" : "Name"}</span>
+                  <ChevronDown
+                    size={16}
+                    onClick={() =>
+                      setSortBy(sortBy === "recent" ? "name" : "recent")
+                    }
+                    className="text-gray-600 dark:text-gray-300"
+                  />
+                </button>
+              </div>
+
               <button
-                onClick={() => setShowModal(false)}
-                className="bg-red-500 hover:bg-red-400 text-white px-4 py-2 rounded"
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg transition-colors duration-200 shadow-sm"
               >
-                Cancel
+                <Plus size={18} />
+                <span>New</span>
               </button>
             </div>
           </div>
-        </div>
-      )}
 
-      <ShareDocument
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        documentId={selectedDocId}
-        darkMode={darkMode}
-        onShare={handleShare}
-      />
-    </div>
-  );
-};
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+            </div>
+          ) : sortedDocuments.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {sortedDocuments.map((doc) => (
+                <div
+                  key={doc._id}
+                  onClick={() => openSpecificDoc(doc._id)}
+                  className={`rounded-xl p-4 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 transition-all duration-200 border border-gray-200 dark:border-gray-800 shadow-sm ${
+                    theme ? "bg-gray-850" : "bg-white"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                        <FileText
+                          size={20}
+                          className="text-blue-600 dark:text-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-medium mb-0.5 text-gray-900 dark:text-white">
+                          {doc.title}
+                        </h3>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {formatDate(doc.updatedAt || doc.createdAt)}
+                        </p>
+                      </div>
+                    </div>
 
-export default Dashboard;
+                    <div className="flex items-center gap-2">
+                      {doc.roles.creator === userId && (
+                        <>
+                          <button
+                            onClick={(e) => openShareModal(doc._id, e)}
+                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                            aria-label="Share document"
+                          >
+                            <Share2 size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => delSpecificDoc(doc._id, e)}
+                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                            aria-label="Delete document"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openSpecificDoc(doc._id);
+                        }}
+                        className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                        aria-label="Edit document"
+                      >
+                        <Edit size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 bg-white dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+              <FileText size={48} className="text-gray-400 mb-4" />
+              {searchQuery ? (
+                <p className="text-center text-gray-700 dark:text-gray-300">
+                  No documents match your search criteria
+                </p>
+              ) : (
+                <>
+                  <p className="text-lg font-medium mb-2 text-gray-900 dark:text-white">
+                    No documents yet
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4 text-center">
+                    Create your first document to get started
+                  </p>
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                  >
+                    <Plus size={18} />
+                    Create Document
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowOpenDocumentModal(true)}
+            className="px-4 py-2 my-5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Open Document
+          </button>
+          <OpenDocument
+            isOpen={showOpenDocumentModal}
+            onClose={() => setShowOpenDocumentModal(false)}
+            theme={theme}
+            onOpen={openSpecificDoc}/>
+        </main>
+
+        {/* Footer */}
+        <footer className="fixed bottom-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 py-3 px-6 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p>© {new Date().getFullYear()} CollabEdit. All rights reserved.</p>
+        </footer>
+
+        {/* New Document Modal */}
+        {showModal && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+            onClick={() => setShowModal(false)}
+          >
+            <div
+              className={`rounded-xl shadow-xl max-w-md w-full ${
+                theme ? "bg-gray-800 text-white" : "bg-white text-gray-900"
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <h2 className="text-xl font-bold mb-1 text-gray-900 dark:text-white">
+                  Create New Document
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+                  Enter a name for your new document
+                </p>
+
+                <input
+                  type="text"
+                  placeholder="Document name"
+                  value={newDocumentName}
+                  onChange={(e) => setNewDocumentName(e.target.value)}
+                  className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none mb-6"
+                  autoFocus
+                />
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateDocument}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Share Document Modal */}
+        <ShareDocument
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          documentId={selectedDocId}
+          theme={theme}
+          onShare={handleShare}
+        />
+      </div>
+    );
+  };
+
+  export default Dashboard;

@@ -1,26 +1,13 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, AlertCircle, Check, Loader2 } from "lucide-react";
 import axios from "axios";
-import { Link,useNavigate } from "react-router-dom";
-
-// Custom Alert Component
-const CustomAlert = ({ children, variant = "error" }) => {
-  const variants = {
-    error: "bg-red-50 text-red-700 border-red-200",
-    success: "bg-green-50 text-green-700 border-green-200",
-  };
-
-  return (
-    <div
-      className={`${variants[variant]} flex items-center p-4 rounded-lg border`}
-    >
-      {children}
-    </div>
-  );
-};
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import useAuthStore from "../store/useAppStore";
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { setAuthenticated, setUser } = useAuthStore();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -28,11 +15,9 @@ const Signup = () => {
     confirmPassword: "",
   });
   const [errors, setErrors] = useState({});
-  const [messages, setMessages] = useState({ success: "", error: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
-  const [error, setError] = useState("");
 
   const validatePassword = (password) => {
     let strength = 0;
@@ -54,7 +39,6 @@ const Signup = () => {
       setPasswordStrength(validatePassword(value));
     }
 
-    // Clear errors when user types
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -86,48 +70,40 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Call validateForm to check for errors
-    if (!validateForm()) {
-      return; // If the form is invalid, prevent the submission
-    }
+    if (!validateForm()) return;
 
-    setLoading(true); // Start loading indicator
+    setLoading(true);
 
     try {
       const response = await axios.post(
-        "http://localhost:3000/signup",
+        "http://localhost:3000/api/auth/signup",
         formData,
-        {withCredentials: true}
+        { withCredentials: true }
       );
-      setMessages({
-        success: response.data.message || "Account created successfully!",
-      });
+
+      toast.success(response.data.message || "Account created successfully!");
       setFormData({
         name: "",
         email: "",
         password: "",
         confirmPassword: "",
       });
-      localStorage.setItem('userToken',response.data.token);
       setPasswordStrength(0);
+      setAuthenticated(true);
+      setUser(response.data.user);
       setTimeout(() => navigate("/dashboard"), 2000);
     } catch (error) {
       if (error.response?.status === 409) {
-        // If the status code is 409, set a specific error message for user already existing
-        setMessages({
-          error: "User already exists. Please try with a different email.",
-        });
+        toast.error("User already exists. Please try with a different email.");
       } else {
-        // For other errors, set the default error message
-        const errorMessage =
+        toast.error(
           error.response?.data?.message ||
-          "Failed to create account. Please try again.";
-        setMessages({ error: errorMessage });
+            "Failed to create account. Please try again."
+        );
       }
     } finally {
       setLoading(false);
     }
-
   };
 
   return (
@@ -136,19 +112,6 @@ const Signup = () => {
         <h2 className="text-3xl font-bold text-center mb-6 text-gray-800">
           Create Account
         </h2>
-
-        {messages.error && (
-          <CustomAlert>
-            <AlertCircle className="h-4 w-4 mr-2" />
-            <span>{messages.error}</span>
-          </CustomAlert>
-        )}
-        {messages.success && (
-          <CustomAlert variant="success">
-            <Check className="h-4 w-4 mr-2" />
-            <span>{messages.success}</span>
-          </CustomAlert>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

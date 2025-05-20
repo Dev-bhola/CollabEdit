@@ -3,23 +3,24 @@
 }
 
 body {
-  background-color: #F3F3F3;
+  background-color: white; /* Changed from #F3F3F3 to white */
   margin: 0;
 }
 
 .container .ql-editor {
-  width: 8.5in;
-  min-height: 11in;
-  padding: 1in;
-  margin: 1rem;
-  box-shadow: 0 0 5px 0 rgba(0, 0, 0, .5);
-  background-color: white;
+  width: 100%;                /* Stretch full width */
+  min-height: 100vh;          /* Full screen height */
+  padding: 2rem;              /* Comfortable padding */
+  margin: 0;                  /* Remove margin */
+  box-shadow: none;           /* Remove shadow */
+  background-color: white;    /* Ensure it stays white */
 }
 
 .container .ql-container.ql-snow {
   border: none;
   display: flex;
   justify-content: center;
+  background-color: white;    /* Remove gray tone behind editor */
 }
 
 .container .ql-toolbar.ql-snow {
@@ -28,9 +29,9 @@ body {
   position: sticky;
   top: 0;
   z-index: 1;
-  background-color: #F3F3F3;
+  background-color: white;    /* Match background to editor */
   border: none;
-  box-shadow: 0 0 5px 0 rgba(0, 0, 0, .5);
+  box-shadow: 0 0 5px 0 rgba(0, 0, 0, .1); /* Lighter shadow or remove entirely */
 }
 
 @page {

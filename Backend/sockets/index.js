@@ -1,0 +1,75 @@
+const { Server } = require("socket.io");
+const { authenticateSocket } = require("./auth");
+const Document = require("../models/Document");
+const userModel = require("../models/user");
+
+function setupSocket(server) {
+  const io = new Server(server, {
+    cors: {
+      origin: "http://localhost:5173",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+  });
+
+  io.use(authenticateSocket);
+
+  io.on("connection", (socket) => {
+    socket.on("get-document", async (title) => {
+      const userId = socket.userId;
+      const document = await findOrCreateDocument(title, userId);
+
+      const role = getRole(document, socket.userId);
+      socket.userRole = role;
+
+      socket.join(document._id.toString());
+      socket.emit("load-document", document.content);
+      socket.emit("user-role", role);
+
+      socket.on("send-changes", (delta) => {
+        if (["viewer", "none"].includes(role)) return;
+        socket.broadcast
+          .to(document._id.toString())
+          .emit("receive-changes", delta);
+      });
+
+      socket.on("save-document", async (data) => {
+        if (["viewer", "none"].includes(role)) return;
+        await Document.findByIdAndUpdate(document._id, {
+          content: data,
+          updatedAt: Date.now(),
+          lastModifiedBy: userId,
+        });
+      });
+    });
+  });
+}
+
+function getRole(document, userId) {
+  if (document.roles.creator?.equals(userId)) return "creator";
+  if (document.roles.editors?.some((id) => id.equals(userId))) return "editor";
+  if (document.roles.viewers?.some((id) => id.equals(userId))) return "viewer";
+  return "none";
+}
+
+async function findOrCreateDocument(title, userId) {
+  if (!title) return null;
+
+  let document = await Document.findOne({ title });
+  if (document) return document;
+
+  document = await Document.create({
+    title,
+    content: "",
+    roles: { creator: userId, editors: [], viewers: [] },
+    lastModifiedBy: userId,
+  });
+
+  await userModel.findByIdAndUpdate(userId, {
+    $push: { documents: document._id },
+  });
+
+  return document;
+}
+
+module.exports = { setupSocket };
