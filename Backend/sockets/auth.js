@@ -16,6 +16,7 @@ async function authenticateSocket(socket, next) {
     if (!user) return next(new Error("User not found"));
 
     socket.userId = user._id;
+    socket.username = user.name || user.email || "Unknown";
     socket.userRole = null;
     next();
   } catch (err) {
