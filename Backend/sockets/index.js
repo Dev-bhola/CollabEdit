@@ -6,7 +6,10 @@ const userModel = require("../models/user");
 function setupSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: [
+    "http://localhost:5173",
+    "https://collab-edit-mci7x4gdv-dev-bholas-projects.vercel.app"
+  ],
       methods: ["GET", "POST"],
       credentials: true,
     },
