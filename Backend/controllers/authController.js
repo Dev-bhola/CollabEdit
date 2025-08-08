@@ -62,6 +62,7 @@ exports.login = async (req, res) => {
       sameSite: "lax",
       maxAge: req.body.rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
+    console.log("Login successful, token set in cookies: "+ token);  
     const userObj = user.toObject();
     delete userObj.password;
     delete userObj.passwordResetToken;
