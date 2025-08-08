@@ -26,9 +26,9 @@ exports.signup = async (req, res) => {
     );
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: true, // ✅ Always true for cross-origin
+      sameSite: "None", // ✅ Required for cross-site cookies
+      maxAge: req.body.rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
     const userObj = newUser.toObject();
     delete userObj.password;
@@ -58,8 +58,8 @@ exports.login = async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: true, // ✅ Always true for cross-origin
+      sameSite: "None", // ✅ Required for cross-site cookies
       maxAge: req.body.rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
     console.log("Login successful, token set in cookies: "+ token);  
