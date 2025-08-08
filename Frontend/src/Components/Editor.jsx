@@ -130,7 +130,7 @@ export default function Editor() {
   ];
 
   useEffect(() => {
-    const s = io("http://localhost:3000", {
+    const s = io("https://collabedit-n5qv.onrender.com", {
       withCredentials: true,
     });
     setSocket(s);
