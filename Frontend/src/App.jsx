@@ -21,7 +21,7 @@ function App() {
     const checkAuth = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:3000/api/auth/check",
+          "https://collabedit-n5qv.onrender.com/api/auth/check",
           {
             withCredentials: true,
           }

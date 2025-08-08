@@ -7,10 +7,12 @@ const { corsOptions } = require("./config/corsOptions");
 const app = express();
 
 // Middlewares
+app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-app.use(cors(corsOptions));
+
+
 
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));

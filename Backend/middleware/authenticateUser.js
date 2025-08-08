@@ -5,6 +5,7 @@ const SECRET = process.env.JWT_SECRET;
 
 exports.authenticateUser = async (req, res, next) => {
   const token = req.cookies.token;
+  console.log("Cookies received:", token);
   if (!token) return res.status(401).json({ message: "No token provided" });
 
   try {

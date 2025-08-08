@@ -103,7 +103,7 @@ const Dashboard = () => {
   const handleShare = async (docId, email, role) => {
     try {
       const response = await axios.post(
-        "http://localhost:3000/api/documents/share",
+        "https://collabedit-n5qv.onrender.com/api/documents/share",
         { documentId: docId, email, role },
         { withCredentials: true }
       );
@@ -125,7 +125,7 @@ const Dashboard = () => {
   const handleLogout = async () => {
     try {
       await axios.post(
-        "http://localhost:3000/api/auth/logout",
+        "https://collabedit-n5qv.onrender.com/api/auth/logout",
         {},
         { withCredentials: true }
       );
@@ -142,7 +142,7 @@ const Dashboard = () => {
     console.log(id);
     try {
       await axios.post(
-        "http://localhost:3000/api/documents/delete",
+        "https://collabedit-n5qv.onrender.com/documents/delete",
         { data: id },
         { withCredentials: true }
       );
@@ -158,7 +158,7 @@ const Dashboard = () => {
     setIsLoading(true);
 
     axios
-      .get("http://localhost:3000/api/documents", {
+      .get("https://collabedit-n5qv.onrender.com/api/documents", {
         withCredentials: true,
       })
       .then((response) => {

@@ -23,11 +23,11 @@ const ForgotPass = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:3000/forgot-password",
+        "https://collabedit-n5qv.onrender.com/forgot-password",
         {
-          email, 
-        }
-        ,{
+          email,
+        },
+        {
           withCredentials: true,
         }
       );
