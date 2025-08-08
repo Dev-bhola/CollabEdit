@@ -50,7 +50,16 @@ function setupSocket(server) {
           .to(document._id.toString())
           .emit("receive-changes", delta);
       });
-
+      socket.on("cursor-position", ({ userId, range, name}) => {
+        const docId = document._id.toString();
+        const color= "#f97316";
+        socket.broadcast.to(docId).emit("cursor-position", {
+          userId,
+          range,
+          name,
+          color,
+        });
+      });
       socket.on("save-document", async (data) => {
         if (["viewer", "none"].includes(role)) return;
         await Document.findByIdAndUpdate(document._id, {
@@ -64,7 +73,7 @@ function setupSocket(server) {
 
         const usersMap = activeUsers.get(docId);
         usersMap.delete(socket.id);
-
+        io.to(docId).emit("user-left", socket.userId);
         if (usersMap.size === 0) {
           activeUsers.delete(docId);
         } else {
